@@ -1,0 +1,205 @@
+<!-- mnist1121.js 연동 -->
+<!-- <html>
+    <head>
+        <title>MNSIT Test with Tensorflow JS</title>
+    </head>
+    <body>
+        <form action="/upload" method="post" enctype="multipart/form-data">
+            Select image to upload:
+            <input type="file" name="image" id="image">
+            <input type="submit" value="Upload Image" name="submit">
+        </form>
+    </body>
+</html> -->
+
+
+
+<!-- sockettest.js 연동 -->
+<!-- <html>
+    <head>
+        <title>socket io test</title>
+        <script src="/socket.io/socket.io.js"></script>
+    </head>
+    <body>
+        <script>
+            const socket = io();
+            function sendMyMSG(msg)
+            {
+                socket.emit("hello", msg);
+            }
+            
+            socket.on("hello", (data)=>{
+                console.log(data);
+            });
+        </script>
+        <input type="text" id="mydata"/>
+        <button onclick='sendMyMSG(document.getElementById("mydata").value)'>메시지 전송!!</button>
+    </body>
+</html> -->
+
+<!-- <html>
+    <head>
+    <title>socket io test</title>
+        <script src="/socket.io/socket.io.js"></script>
+    </head>
+    <body>
+        <script>
+            const socket = io();
+            function upload(files) {
+                socket.emit("upload", 
+                            {'Name': files[0].name,
+                            'Data' : files[0]
+                            },
+                            (status) => {console.log(status);}
+                );
+            }
+            socket.on("isfinish", (data)=>{
+                console.log(data);
+            });
+        </script>
+        <label for="FileBox">Choose A File: </label><input type="file" id="FileBox"><br>
+        <button type='button' id='UploadButton' class='Button'
+                    onclick="upload(document.getElementById('FileBox').files)">Upload</button>
+    </body>
+</html> -->
+
+<!-- socketProject.js 연동 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Service for Prediction Image</title>
+    <style>
+        /* Reset some default styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f7f6;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .container {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            width: 300px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        /* File input styling */
+        .file-input-container {
+            margin-bottom: 20px;
+        }
+
+        input[type="file"] {
+            padding: 20px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            background-color: #fafafa;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        input[type="file"]:hover {
+            background-color: #f1f1f1;
+        }
+
+        input[type="submit"] {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        .footer {
+            margin-top: 20px;
+            font-size: 12px;
+            color: #888;
+        }
+
+        .result {
+            margin-top: 20px;
+        }
+
+        #uploadedImage {
+            width: 100%;
+            max-width: 250px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Upload Image for Prediction</h1>
+        <form action="/upload" method="post" enctype="multipart/form-data" id="uploadForm">
+            <div class="file-input-container">
+                <label for="image">Select image to upload:</label><br>
+                <input type="file" name="image" id="image" accept="image/*">
+            </div>
+            <input type="submit" value="Upload Image" name="submit">
+        </form>
+        <div class="footer">
+            <p>Powered by TensorFlow.js</p>
+        </div>
+
+        <!-- 결과를 표시할 곳 -->
+        <div id="resultDiv" class="result">
+            <!-- Prediction results will be displayed here -->
+        </div>
+    </div>
+
+    <script>
+        // 폼 제출 이벤트 처리
+        document.getElementById('uploadForm').addEventListener('submit', function(event) {
+            event.preventDefault(); // 기본 폼 제출 방지
+            const form = event.target;
+            const formData = new FormData(form);
+
+            // 서버로 파일을 전송
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json()) // 서버에서 예측 결과 받아오기
+            .then(data => {
+                const resultDiv = document.getElementById('resultDiv');
+                
+                // 업로드된 이미지 표시
+                const uploadedImage = document.createElement('img');
+                uploadedImage.id = 'uploadedImage';
+                uploadedImage.src = URL.createObjectURL(formData.get('image'));
+                resultDiv.appendChild(uploadedImage);
+                
+                // 예측 결과 표시
+                resultDiv.innerHTML += `
+                    <h3>Prediction Result:</h3>
+                    <p><strong>Predicted Class:</strong> ${data}</p>
+                `;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        });
+    </script>
+</body>
+</html>
