@@ -1,0 +1,264 @@
+<html>
+    <head>
+        <script src="/socket.io/socket.io.js"></script>
+        <style>
+            /* 기본 스타일 */
+            body {
+                font-family: 'Arial', sans-serif;
+                background-color: #f7f7f7;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                flex-direction: column;
+                height: 100vh;
+                margin: 0;
+                padding: 20px;
+                color: #333;
+            }
+
+            /* 제목 스타일 */
+            h1 {
+                font-size: 28px;
+                color: #333;
+                margin-bottom: 20px;
+                text-align: center;
+                width: 100%;
+            }
+
+            /* 캔버스 및 비디오 컨테이너 */
+            .canvas-container {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                width: 100%;
+                max-width: 1400px;
+                margin-top: 20px;
+            }
+
+            /* 캔버스와 비디오 간 간격 */
+            .canvas-wrapper {
+                display: flex;
+                justify-content: space-between;
+                gap: 20px;
+            }
+
+            /* 비디오 및 캔버스 스타일 */
+            video, canvas {
+                display: block;
+                margin-bottom: 20px;
+                border: 3px solid #ccc;
+                border-radius: 8px;
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            }
+
+            #video {
+                display: none;
+            }
+
+            #canvas, #canvas2, #captureCanvas {
+                width: 640px;
+                height: 480px;
+                background-color: #ffffff;
+            }
+
+            #canvas2 {
+                border: 2px solid #00FFFF;
+                border-radius: 8px;
+            }
+
+            #captureCanvas {
+                border: 2px solid red;
+                border-radius: 8px;
+                margin-left: 10px;
+            }
+
+            /* 버튼 스타일 */
+            button {
+                padding: 12px 24px;
+                font-size: 16px;
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                border-radius: 8px;
+                cursor: pointer;
+                transition: background-color 0.3s ease;
+                margin: 10px;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            }
+
+            button:hover {
+                background-color: #45a049;
+            }
+
+            /* 버튼 컨테이너 스타일 */
+            div {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                margin-top: 20px;
+                width: 100%;
+            }
+
+            /* 반응형 디자인 */
+            @media (max-width: 768px) {
+                .canvas-wrapper {
+                    flex-direction: column;
+                    align-items: center;
+                }
+                #canvas, #canvas2, #captureCanvas {
+                    width: 100%;
+                    height: auto;
+                }
+                button {
+                    width: 100%;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <h1>객체 탐지 및 캡처</h1>
+        <div class="canvas-container">
+            <div class="canvas-wrapper">
+                <video id="video" width="640" height="480" autoplay style="display:none"></video>
+                <canvas id="canvas" width="640" height="480" style="display:none"></canvas>
+                <canvas id="canvas2" width="640" height="480"></canvas>
+                <canvas id="captureCanvas" width="640" height="480"></canvas>
+            </div>
+        </div>
+        <div>
+            <button id="sendButton">객체 탐지</button>
+            <button id="captureButton">캡처</button>
+        </div>
+
+        <script>
+            const socket = io();
+
+            var boxes_data = null;
+            var scores_data = null;
+            var classes_data = null;
+            var valid_detections_data = null;
+           
+            const video = document.getElementById('video');
+            const canvas = document.getElementById('canvas');
+            const canvas2 = document.getElementById('canvas2');
+            const captureCanvas = document.getElementById('captureCanvas');
+            const context = canvas.getContext('2d');
+            const context2 = canvas2.getContext('2d');
+            const captureContext = captureCanvas.getContext('2d');
+
+            const font = "16px sans-serif";
+            const coco_names = ['person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat', 'traffic light',
+                    'fire hydrant', 'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep', 'cow',
+                    'elephant', 'bear', 'zebra', 'giraffe', 'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee',
+                    'skis', 'snowboard', 'sports ball', 'kite', 'baseball bat', 'baseball glove', 'skateboard', 'surfboard',
+                    'tennis racket', 'bottle', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl', 'banana', 'apple',
+                    'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza', 'donut', 'cake', 'chair', 'couch',
+                    'potted plant', 'bed', 'dining table', 'toilet', 'tv', 'laptop', 'mouse', 'remote', 'keyboard', 'cell phone',
+                    'microwave', 'oven', 'toaster', 'sink', 'refrigerator', 'book', 'clock', 'vase', 'scissors', 'teddy bear',
+                    'hair drier', 'toothbrush']
+
+            socket.on("isfinish", (data) => {
+                context2.font = font;
+                context2.textBaseline = "top";
+
+                const [boxes, scores, classes, valid_detections] = data;
+                boxes_data = boxes;
+                scores_data = scores;
+                classes_data = classes;
+                valid_detections_data = valid_detections;
+
+                const imageData = canvas.toDataURL(); // Canvas 이미지를 데이터 URL로 변환
+                sendImageData(imageData);
+            });
+
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(stream => {
+                    video.srcObject = stream;
+                    function draw() {
+                        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                        context2.drawImage(video, 0, 0, canvas2.width, canvas2.height);
+                        requestAnimationFrame(draw);
+
+                        if (boxes_data) {
+                            for (let i = 0; i < valid_detections_data; ++i) {
+                                let [x1, y1, x2, y2] = boxes_data.slice(i * 4, (i + 1) * 4);
+                                x1 *= canvas.width;
+                                x2 *= canvas.width;
+                                y1 *= canvas.height;
+                                y2 *= canvas.height;
+                                const width = x2 - x1;
+                                const height = y2 - y1;
+                                const klass = coco_names[classes_data[i]];
+                                const score = scores_data[i].toFixed(2);
+
+                                // Draw bounding box
+                                context2.strokeStyle = "#00FFFF";
+                                context2.lineWidth = 4;
+                                context2.strokeRect(x1, y1, width, height);
+
+                                // Draw label background
+                                context2.fillStyle = "#00FFFF";
+                                const textWidth = context2.measureText(klass + ":" + score).width;
+                                const textHeight = parseInt(font, 10); // base 10
+                                context2.fillRect(x1, y1, textWidth + 4, textHeight + 4);
+                            }
+
+                            for (let i = 0; i < valid_detections_data; ++i) {
+                                let [x1, y1] = boxes_data.slice(i * 4, i * 4 + 2);
+                                x1 *= canvas.width;
+                                y1 *= canvas.height;
+                                const klass = coco_names[classes_data[i]];
+                                const score = scores_data[i].toFixed(2);
+
+                                // Draw text
+                                context2.fillStyle = "#000000";
+                                context2.fillText(klass + ":" + score, x1, y1);
+                            }
+                        }
+                    }
+                    draw();
+                })
+                .catch(error => console.error('웹캠 접근 에러:', error));
+
+            // 그림 전송 버튼 클릭 이벤트
+            const sendButton = document.getElementById('sendButton');
+            sendButton.addEventListener('click', () => {
+                const imageData = canvas.toDataURL();
+                sendImageData(imageData);
+            });
+
+            function sendImageData(imageData) {
+                socket.emit("upload", { 'Data': imageData }, (status) => { console.log(status); });
+            }
+
+            // 캡처 버튼 클릭 이벤트
+            const captureButton = document.getElementById('captureButton');
+            captureButton.addEventListener('click', () => {
+                // canvas2의 현재 화면을 captureCanvas로 복사
+                captureContext.drawImage(canvas2, 0, 0, captureCanvas.width, captureCanvas.height);
+
+                 // 캡처된 이미지에 객체 정보 추가
+                if (boxes_data) {
+                    for (let i = 0; i < valid_detections_data; ++i) {
+                        let [x1, y1, x2, y2] = boxes_data.slice(i * 4, (i + 1) * 4);
+                        x1 *= canvas.width;
+                        x2 *= canvas.width;
+                        y1 *= canvas.height;
+                        y2 *= canvas.height;
+                        const width = x2 - x1;
+                        const height = y2 - y1;
+                        const klass = coco_names[classes_data[i]];
+                        const score = scores_data[i].toFixed(2);
+
+                        // 캡처된 캔버스에 텍스트로 객체 정보 추가
+                        captureContext.font = font;
+                        captureContext.fillStyle = "#000000";
+                        captureContext.fillText(klass + ": " + score, x1, y1 - 10); // 객체 이름과 점수 표시
+                    }
+                }
+                
+                console.log("화면 캡처 완료");
+            });
+        </script>
+    </body>
+</html>
